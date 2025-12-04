@@ -7,6 +7,7 @@ import { Pool } from '@neondatabase/serverless';
 // If running in browser, this will work but credentials in VITE_DATABASE_URL will be visible to users.
 const pool = new Pool({
     connectionString: import.meta.env.VITE_DATABASE_URL,
+    disableWarningInBrowsers: true,
 });
 
 export const query = async (text, params) => {

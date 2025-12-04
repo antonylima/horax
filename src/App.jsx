@@ -108,7 +108,10 @@ function App() {
   useEffect(() => {
     const checkNotifications = () => {
       const now = new Date();
-      const today = now.toISOString().split('T')[0];
+      // Use local date string YYYY-MM-DD
+      const offset = now.getTimezoneOffset();
+      const localDate = new Date(now.getTime() - (offset * 60 * 1000));
+      const today = localDate.toISOString().split('T')[0];
 
       setTasks(prevTasks => {
         let updated = false;
@@ -204,7 +207,8 @@ function App() {
     const now = new Date();
     const taskDate = new Date(`${task.date}T${task.startTime}`);
 
-    if (taskDate < now) {
+    // Check if task is in the past (allow 1 minute buffer)
+    if (taskDate < new Date(now.getTime() - 60000)) {
       return { valid: false, message: 'Cannot create tasks in the past' };
     }
 

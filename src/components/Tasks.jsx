@@ -16,7 +16,12 @@ const Tasks = ({
     const [formData, setFormData] = useState({
         id: '',
         title: '',
-        date: new Date().toISOString().split('T')[0],
+        date: (() => {
+            const now = new Date();
+            const offset = now.getTimezoneOffset();
+            const localDate = new Date(now.getTime() - (offset * 60 * 1000));
+            return localDate.toISOString().split('T')[0];
+        })(),
         startTime: '',
         endTime: '',
         tags: ''
@@ -49,7 +54,12 @@ const Tasks = ({
             setFormData({
                 id: '',
                 title: '',
-                date: new Date().toISOString().split('T')[0],
+                date: (() => {
+                    const now = new Date();
+                    const offset = now.getTimezoneOffset();
+                    const localDate = new Date(now.getTime() - (offset * 60 * 1000));
+                    return localDate.toISOString().split('T')[0];
+                })(),
                 startTime: '',
                 endTime: '',
                 tags: ''
@@ -165,7 +175,8 @@ const Tasks = ({
     };
 
     const formatDate = (dateString) => {
-        const date = new Date(dateString);
+        // Parse YYYY-MM-DD as local date by appending time
+        const date = new Date(`${dateString}T00:00:00`);
         const options = { month: 'short', day: 'numeric' };
         return date.toLocaleDateString(undefined, options);
     };
@@ -174,7 +185,9 @@ const Tasks = ({
     const filteredTasks = useMemo(() => {
         let result = [...tasks];
         const now = new Date();
-        const today = now.toISOString().split('T')[0];
+        const offset = now.getTimezoneOffset();
+        const localDate = new Date(now.getTime() - (offset * 60 * 1000));
+        const today = localDate.toISOString().split('T')[0];
 
         // Day Filter
         if (filters.day === 'today') {
@@ -410,7 +423,11 @@ const Tasks = ({
                     ) : (
                         Object.keys(tasksByDate).map(date => {
                             const dateTasks = tasksByDate[date];
-                            const isToday = date === new Date().toISOString().split('T')[0];
+                            const now = new Date();
+                            const offset = now.getTimezoneOffset();
+                            const localDate = new Date(now.getTime() - (offset * 60 * 1000));
+                            const today = localDate.toISOString().split('T')[0];
+                            const isToday = date === today;
                             const dateStr = isToday ? 'Today' : formatDate(date);
 
                             return (

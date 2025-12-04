@@ -3,7 +3,10 @@ import { FaCalendarDay, FaCalendarWeek, FaChartLine, FaCopy, FaCalendarTimes, Fa
 
 const Dashboard = ({ tasks, onEditTask, onDeleteTask, onToggleTaskComplete, onOpenCopyModal }) => {
     const now = new Date();
-    const today = now.toISOString().split('T')[0];
+    // Use local date string YYYY-MM-DD
+    const offset = now.getTimezoneOffset();
+    const localDate = new Date(now.getTime() - (offset * 60 * 1000));
+    const today = localDate.toISOString().split('T')[0];
 
     const dailyRemaining = useMemo(() => {
         const startOfDay = new Date(now);
@@ -120,7 +123,8 @@ const Dashboard = ({ tasks, onEditTask, onDeleteTask, onToggleTaskComplete, onOp
     };
 
     const formatDate = (dateString) => {
-        const date = new Date(dateString);
+        // Parse YYYY-MM-DD as local date by appending time
+        const date = new Date(`${dateString}T00:00:00`);
         const options = { month: 'short', day: 'numeric' };
         return date.toLocaleDateString(undefined, options);
     };
