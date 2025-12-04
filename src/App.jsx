@@ -281,7 +281,7 @@ function App() {
   };
 
   // Modal Handlers
-  const generateDayOptions = (startDate, count = 14) => {
+  const generateDayOptions = (startDate, count = 60) => {
     const options = [];
     const start = new Date(startDate);
     start.setHours(0, 0, 0, 0);
@@ -413,7 +413,7 @@ function App() {
     const options = [];
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    for (let i = 0; i <= 14; i++) {
+    for (let i = 0; i <= 60; i++) {
       const date = new Date(today);
       date.setDate(today.getDate() + i);
       options.push({

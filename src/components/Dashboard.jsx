@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { FaCalendarDay, FaCalendarWeek, FaChartLine, FaCopy, FaCalendarTimes, FaCalendarPlus, FaCheckCircle, FaCircle, FaEdit, FaTrash, FaClock } from 'react-icons/fa';
+import { FaCalendarDay, FaCalendarWeek, FaChartLine, FaCopy, FaCalendarTimes, FaCalendarPlus, FaCheckCircle, FaCircle, FaEdit, FaTrash, FaClock, FaCalendarAlt } from 'react-icons/fa';
 
 const Dashboard = ({ tasks, onEditTask, onDeleteTask, onToggleTaskComplete, onOpenCopyModal }) => {
     const now = new Date();
@@ -7,6 +7,21 @@ const Dashboard = ({ tasks, onEditTask, onDeleteTask, onToggleTaskComplete, onOp
     const offset = now.getTimezoneOffset();
     const localDate = new Date(now.getTime() - (offset * 60 * 1000));
     const today = localDate.toISOString().split('T')[0];
+
+    const formatTime = (timeString) => {
+        const [hours, minutes] = timeString.split(':');
+        const hour = parseInt(hours, 10);
+        const ampm = hour >= 12 ? 'PM' : 'AM';
+        const displayHour = hour % 12 || 12;
+        return `${displayHour}:${minutes} ${ampm}`;
+    };
+
+    const formatDate = (dateString) => {
+        // Parse YYYY-MM-DD as local date by appending time
+        const date = new Date(`${dateString}T00:00:00`);
+        const options = { month: 'short', day: 'numeric' };
+        return date.toLocaleDateString(undefined, options);
+    };
 
     const dailyRemaining = useMemo(() => {
         const startOfDay = new Date(now);
@@ -31,45 +46,74 @@ const Dashboard = ({ tasks, onEditTask, onDeleteTask, onToggleTaskComplete, onOp
         return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
     }, [tasks, now, today]);
 
-    const weeklyRemaining = useMemo(() => {
+    const weeklySchedules = useMemo(() => {
+        const weeks = [];
         const dayOfWeek = now.getDay();
-
-        if (dayOfWeek === 0) {
-            return dailyRemaining;
-        }
-
-        const startOfWeek = new Date(now);
+        const startOfCurrentWeek = new Date(now);
         const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-        startOfWeek.setDate(now.getDate() - daysSinceMonday);
-        startOfWeek.setHours(0, 0, 0, 0);
+        startOfCurrentWeek.setDate(now.getDate() - daysSinceMonday);
+        startOfCurrentWeek.setHours(0, 0, 0, 0);
 
-        const endOfWeek = new Date(startOfWeek);
-        endOfWeek.setDate(startOfWeek.getDate() + 6);
-        endOfWeek.setHours(23, 59, 59, 999);
+        // Generate 8 weeks (covering ~2 months)
+        for (let i = 0; i < 8; i++) {
+            const start = new Date(startOfCurrentWeek);
+            start.setDate(startOfCurrentWeek.getDate() + (i * 7));
 
-        const totalWeekMs = 7 * 24 * 60 * 60 * 1000;
-        const timePassedSinceStartOfWeek = now - startOfWeek;
+            const end = new Date(start);
+            end.setDate(start.getDate() + 6);
+            end.setHours(23, 59, 59, 999);
 
-        let totalTaskDuration = 0;
-        tasks.forEach(task => {
-            const taskDate = new Date(task.date);
-            if (taskDate >= startOfWeek && taskDate <= endOfWeek) {
-                const startTime = new Date(`${task.date}T${task.startTime}`);
-                const endTime = new Date(`${task.date}T${task.endTime}`);
-                totalTaskDuration += endTime - startTime;
+            // Filter tasks for this week
+            const weekTasks = tasks
+                .filter(task => {
+                    const tDate = new Date(`${task.date}T00:00:00`);
+                    return tDate >= start && tDate <= end && !task.completed;
+                })
+                .sort((a, b) => {
+                    const dateCompare = a.date.localeCompare(b.date);
+                    if (dateCompare !== 0) return dateCompare;
+                    return a.startTime.localeCompare(b.startTime);
+                });
+
+            // Calculate remaining time
+            const totalWeekMs = 7 * 24 * 60 * 60 * 1000;
+            let timePassed = 0;
+
+            if (i === 0) { // Current week
+                timePassed = now - start;
+                if (timePassed < 0) timePassed = 0;
             }
-        });
 
-        const remainingFreeTimeMs = totalWeekMs - timePassedSinceStartOfWeek - totalTaskDuration;
+            // Calculate total scheduled duration (including completed)
+            let scheduledDuration = 0;
+            tasks.forEach(task => {
+                const tDate = new Date(`${task.date}T00:00:00`);
+                if (tDate >= start && tDate <= end) {
+                    const s = new Date(`${task.date}T${task.startTime}`);
+                    const e = new Date(`${task.date}T${task.endTime}`);
+                    scheduledDuration += (e - s);
+                }
+            });
 
-        const hours = Math.floor(remainingFreeTimeMs / (60 * 60 * 1000));
-        const minutes = Math.floor((remainingFreeTimeMs % (60 * 60 * 1000)) / (60 * 1000));
+            const remainingMs = totalWeekMs - timePassed - scheduledDuration;
+            const hours = Math.floor(remainingMs / (60 * 60 * 1000));
+            const minutes = Math.floor((remainingMs % (60 * 60 * 1000)) / (60 * 1000));
+            const displayHours = Math.max(0, hours);
+            const displayMinutes = Math.max(0, minutes);
+            const remainingStr = `${displayHours.toString().padStart(2, '0')}:${displayMinutes.toString().padStart(2, '0')}`;
 
-        const displayHours = Math.max(0, hours);
-        const displayMinutes = Math.max(0, minutes);
-
-        return `${displayHours.toString().padStart(2, '0')}:${displayMinutes.toString().padStart(2, '0')}`;
-    }, [tasks, now, dailyRemaining]);
+            // Add to list if it's current/next week OR has tasks
+            if (i < 2 || weekTasks.length > 0) {
+                weeks.push({
+                    id: i,
+                    label: i === 0 ? "This Week" : i === 1 ? "Next Week" : `Week of ${formatDate(start.toISOString().split('T')[0])}`,
+                    tasks: weekTasks,
+                    remaining: remainingStr
+                });
+            }
+        }
+        return weeks;
+    }, [tasks, now]);
 
     const todayProgress = useMemo(() => {
         let totalTaskDuration = 0;
@@ -114,40 +158,18 @@ const Dashboard = ({ tasks, onEditTask, onDeleteTask, onToggleTaskComplete, onOp
             .slice(0, 5);
     }, [tasks, today]);
 
-    const formatTime = (timeString) => {
-        const [hours, minutes] = timeString.split(':');
-        const hour = parseInt(hours, 10);
-        const ampm = hour >= 12 ? 'PM' : 'AM';
-        const displayHour = hour % 12 || 12;
-        return `${displayHour}:${minutes} ${ampm}`;
-    };
 
-    const formatDate = (dateString) => {
-        // Parse YYYY-MM-DD as local date by appending time
-        const date = new Date(`${dateString}T00:00:00`);
-        const options = { month: 'short', day: 'numeric' };
-        return date.toLocaleDateString(undefined, options);
-    };
 
     return (
         <section className="content-section active">
             <div className="dashboard">
                 <div className="card">
                     <div className="card-header">
-                        <h2 className="card-title">Daily Remaining Time</h2>
+                        <h2 className="card-title">Daily Remaining</h2>
                         <FaCalendarDay />
                     </div>
                     <div className="time-display">{dailyRemaining}</div>
-                    <div className="time-label">Hours:Minutes remaining today</div>
-                </div>
-
-                <div className="card">
-                    <div className="card-header">
-                        <h2 className="card-title">Weekly Remaining Time</h2>
-                        <FaCalendarWeek />
-                    </div>
-                    <div className="time-display">{weeklyRemaining}</div>
-                    <div className="time-label">Hours:Minutes remaining this week</div>
+                    <div className="time-label">Hours:Minutes today</div>
                 </div>
 
                 <div className="card">
@@ -156,11 +178,11 @@ const Dashboard = ({ tasks, onEditTask, onDeleteTask, onToggleTaskComplete, onOp
                         <FaChartLine />
                     </div>
                     <div className="time-display">{todayProgress}</div>
-                    <div className="time-label">Of today's time scheduled</div>
+                    <div className="time-label">Of today's schedule</div>
                 </div>
             </div>
 
-            <div className="card">
+            <div className="card" style={{ marginTop: '20px' }}>
                 <div className="card-header">
                     <h2 className="card-title">Today's Schedule</h2>
                     <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
@@ -207,6 +229,51 @@ const Dashboard = ({ tasks, onEditTask, onDeleteTask, onToggleTaskComplete, onOp
                     )}
                 </div>
             </div>
+
+            {weeklySchedules.map(week => (
+                <div key={week.id} className="card" style={{ marginTop: '20px' }}>
+                    <div className="card-header">
+                        <h2 className="card-title">{week.label} <span style={{ fontSize: '0.8em', opacity: 0.8, marginLeft: '10px' }}>({week.remaining} remaining)</span></h2>
+                        <FaCalendarWeek />
+                    </div>
+                    <div className="task-list">
+                        {week.tasks.length === 0 ? (
+                            <div className="empty-state">
+                                <FaCalendarTimes />
+                                <p>No tasks scheduled</p>
+                            </div>
+                        ) : (
+                            week.tasks.map(task => {
+                                const dateStr = formatDate(task.date);
+                                return (
+                                    <div key={task.id} className="task-item">
+                                        <div className="task-info">
+                                            <div className="task-title">{task.title}</div>
+                                            <div className="task-time">{dateStr}, {formatTime(task.startTime)} - {formatTime(task.endTime)}</div>
+                                            <div className="task-tags">
+                                                {task.tags.map((tag, index) => (
+                                                    <span key={index} className="tag">{tag}</span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="task-actions">
+                                            <button className="btn btn-primary" onClick={() => onToggleTaskComplete(task.id)}>
+                                                <FaCircle />
+                                            </button>
+                                            <button className="btn btn-warning" onClick={() => onEditTask(task)}>
+                                                <FaEdit />
+                                            </button>
+                                            <button className="btn btn-danger" onClick={() => onDeleteTask(task.id)}>
+                                                <FaTrash />
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        )}
+                    </div>
+                </div>
+            ))}
 
             <div className="card" style={{ marginTop: '20px' }}>
                 <div className="card-header">

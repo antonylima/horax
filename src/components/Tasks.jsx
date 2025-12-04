@@ -210,6 +210,24 @@ const Tasks = ({
             const endOfWeekStr = endOfWeek.toISOString().split('T')[0];
 
             result = result.filter(task => task.date >= startOfWeekStr && task.date <= endOfWeekStr);
+        } else if (filters.day === 'next-week') {
+            const dayOfWeek = now.getDay();
+            const startOfWeek = new Date(now);
+            const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+            startOfWeek.setDate(now.getDate() - daysSinceMonday);
+
+            const startOfNextWeek = new Date(startOfWeek);
+            startOfNextWeek.setDate(startOfWeek.getDate() + 7);
+
+            const endOfNextWeek = new Date(startOfNextWeek);
+            endOfNextWeek.setDate(startOfNextWeek.getDate() + 6);
+
+            const startStr = startOfNextWeek.toISOString().split('T')[0];
+            const endStr = endOfNextWeek.toISOString().split('T')[0];
+
+            result = result.filter(task => task.date >= startStr && task.date <= endStr);
+        } else if (filters.day === 'future') {
+            result = result.filter(task => task.date >= today);
         }
 
         // Category Filter
@@ -381,6 +399,8 @@ const Tasks = ({
                             <option value="today">Today</option>
                             <option value="tomorrow">Tomorrow</option>
                             <option value="week">This Week</option>
+                            <option value="next-week">Next Week</option>
+                            <option value="future">All Future</option>
                         </select>
                     </div>
 
