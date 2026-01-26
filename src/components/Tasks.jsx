@@ -31,7 +31,7 @@ const Tasks = ({
     const [showSuggestedSlots, setShowSuggestedSlots] = useState(false);
 
     const [filters, setFilters] = useState({
-        day: 'all',
+        day: 'future',
         category: 'all',
         status: 'all'
     });
@@ -228,6 +228,8 @@ const Tasks = ({
             result = result.filter(task => task.date >= startStr && task.date <= endStr);
         } else if (filters.day === 'future') {
             result = result.filter(task => task.date >= today);
+        } else if (filters.day === 'past') {
+            result = result.filter(task => task.date < today);
         }
 
         // Category Filter
@@ -395,12 +397,13 @@ const Tasks = ({
                             value={filters.day}
                             onChange={(e) => setFilters(prev => ({ ...prev, day: e.target.value }))}
                         >
-                            <option value="all">All Days</option>
+                            <option value="future">All Future</option>
                             <option value="today">Today</option>
                             <option value="tomorrow">Tomorrow</option>
                             <option value="week">This Week</option>
                             <option value="next-week">Next Week</option>
-                            <option value="future">All Future</option>
+                            <option value="past">Past Tasks</option>
+                            <option value="all">All Days</option>
                         </select>
                     </div>
 
