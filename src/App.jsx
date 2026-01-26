@@ -333,7 +333,8 @@ function App() {
     }
 
     let copiedCount = 0;
-    let conflictCount = 0;
+    let duplicateCount = 0;
+    let overlapCount = 0;
 
     // We need to process sequentially or Promise.all
     // But we need to check overlaps. 
@@ -351,6 +352,21 @@ function App() {
             date: targetDate,
             completed: false,
             notified: false
+          };
+
+          // Check for duplicate tasks (same title, time, and date)
+          const isDuplicate = (t, taskList) => {
+            for (const existing of taskList) {
+              if (
+                existing.date === t.date &&
+                existing.title === t.title &&
+                existing.startTime === t.startTime &&
+                existing.endTime === t.endTime
+              ) {
+                return true;
+              }
+            }
+            return false;
           };
 
           // Check overlap against current tasks AND tasksToInsert
@@ -372,11 +388,14 @@ function App() {
             return false;
           };
 
-          if (!isOverlap(newTask, [...tasks, ...tasksToInsert])) {
+          // Skip if duplicate or overlapping
+          if (isDuplicate(newTask, [...tasks, ...tasksToInsert])) {
+            duplicateCount++;
+          } else if (isOverlap(newTask, [...tasks, ...tasksToInsert])) {
+            overlapCount++;
+          } else {
             tasksToInsert.push(newTask);
             copiedCount++;
-          } else {
-            conflictCount++;
           }
         });
       });
@@ -395,8 +414,12 @@ function App() {
       setCopyModalOpen(false);
 
       let message = `Successfully copied ${copiedCount} task(s)`;
-      if (conflictCount > 0) {
-        message += `. ${conflictCount} task(s) skipped due to conflicts (overlap with existing tasks).`;
+      const totalSkipped = duplicateCount + overlapCount;
+      if (totalSkipped > 0) {
+        const skipDetails = [];
+        if (duplicateCount > 0) skipDetails.push(`${duplicateCount} duplicate${duplicateCount > 1 ? 's' : ''}`);
+        if (overlapCount > 0) skipDetails.push(`${overlapCount} overlap${overlapCount > 1 ? 's' : ''}`);
+        message += `. Skipped: ${skipDetails.join(', ')}.`;
         addNotification(message, 'warning'); // Use warning for partial success
       } else {
         addNotification(message, 'success');
