@@ -220,17 +220,15 @@ function App() {
     }
 
     for (const existingTask of tasks) {
-      if (existingTask.id === excludeTaskId) continue;
+      if (existingTask.id == excludeTaskId) continue;
 
       if (existingTask.date === task.date) {
         const existingStart = new Date(`${existingTask.date}T${existingTask.startTime}`);
         const existingEnd = new Date(`${existingTask.date}T${existingTask.endTime}`);
 
-        if (
-          (taskStart >= existingStart && taskStart < existingEnd) ||
-          (taskEnd > existingStart && taskEnd <= existingEnd) ||
-          (taskStart <= existingStart && taskEnd >= existingEnd)
-        ) {
+        // Simple overlap check: (StartA < EndB) && (EndA > StartB)
+        // This handles all overlap cases and correctly allows touching boundaries
+        if (taskStart < existingEnd && taskEnd > existingStart) {
           return { valid: false, message: `Task overlaps with "${existingTask.title}"` };
         }
       }
