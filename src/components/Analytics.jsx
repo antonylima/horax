@@ -10,64 +10,67 @@ import {
 
 const Analytics = ({ tasks }) => {
     const [timePeriod, setTimePeriod] = useState('week'); // week, month, all
+    const [selectedWeekday, setSelectedWeekday] = useState('all'); // all, 0-6 (Sun-Sat)
 
-    // Filter tasks based on time period
+    // Filter tasks based on time period AND weekday
     const filteredTasks = useMemo(() => {
-        if (timePeriod === 'all') return tasks;
+        let periodTasks = tasks;
 
-        // 1. Get current date in User's Local Time (as UTC components)
-        // This 'shifted' date represents user's wall-clock time placed in UTC
-        const now = new Date();
-        const offsetMinutes = now.getTimezoneOffset();
-        const shiftedDate = new Date(now.getTime() - (offsetMinutes * 60 * 1000));
+        // 1. Filter by Time Period
+        if (timePeriod !== 'all') {
+            const now = new Date();
+            const offsetMinutes = now.getTimezoneOffset();
+            const shiftedDate = new Date(now.getTime() - (offsetMinutes * 60 * 1000));
 
-        // Helper to format shifted UTC date as YYYY-MM-DD
-        const getShiftedDateString = (date) => {
-            const year = date.getUTCFullYear();
-            const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-            const day = String(date.getUTCDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
-        };
+            const getShiftedDateString = (date) => {
+                const year = date.getUTCFullYear();
+                const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+                const day = String(date.getUTCDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            };
 
-        if (timePeriod === 'week') {
-            // Use UTC methods on the shifted date because it aligns with user's wall clock
-            const dayOfWeek = shiftedDate.getUTCDay(); // 0=Sun, 1=Mon...
+            if (timePeriod === 'week') {
+                const dayOfWeek = shiftedDate.getUTCDay();
+                const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
 
-            // Calculate start of week (Monday)
-            const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-            const startOfWeek = new Date(shiftedDate);
-            startOfWeek.setUTCDate(shiftedDate.getUTCDate() - daysSinceMonday);
+                const startOfWeek = new Date(shiftedDate);
+                startOfWeek.setUTCDate(shiftedDate.getUTCDate() - daysSinceMonday);
 
-            // Calculate end of week (Sunday)
-            const endOfWeek = new Date(startOfWeek);
-            endOfWeek.setUTCDate(startOfWeek.getUTCDate() + 6);
+                const endOfWeek = new Date(startOfWeek);
+                endOfWeek.setUTCDate(startOfWeek.getUTCDate() + 6);
 
-            const startOfWeekStr = getShiftedDateString(startOfWeek);
-            const endOfWeekStr = getShiftedDateString(endOfWeek);
+                const startOfWeekStr = getShiftedDateString(startOfWeek);
+                const endOfWeekStr = getShiftedDateString(endOfWeek);
 
-            const filtered = tasks.filter(task => task.date >= startOfWeekStr && task.date <= endOfWeekStr);
-            return filtered;
+                periodTasks = tasks.filter(task => task.date >= startOfWeekStr && task.date <= endOfWeekStr);
+            } else if (timePeriod === 'month') {
+                const startOfMonth = new Date(shiftedDate);
+                startOfMonth.setUTCDate(1);
+
+                const endOfMonth = new Date(shiftedDate);
+                endOfMonth.setUTCMonth(endOfMonth.getUTCMonth() + 1);
+                endOfMonth.setUTCDate(0);
+
+                const startStr = getShiftedDateString(startOfMonth);
+                const endStr = getShiftedDateString(endOfMonth);
+
+                periodTasks = tasks.filter(task => task.date >= startStr && task.date <= endStr);
+            }
         }
 
-        if (timePeriod === 'month') {
-            // Start of month: 1st day of current user-month
-            const startOfMonth = new Date(shiftedDate);
-            startOfMonth.setUTCDate(1);
-
-            // End of month: 0th day of next month
-            const endOfMonth = new Date(shiftedDate);
-            endOfMonth.setUTCMonth(endOfMonth.getUTCMonth() + 1);
-            endOfMonth.setUTCDate(0);
-
-            const startStr = getShiftedDateString(startOfMonth);
-            const endStr = getShiftedDateString(endOfMonth);
-
-            const filtered = tasks.filter(task => task.date >= startStr && task.date <= endStr);
-            return filtered;
+        // 2. Filter by Weekday
+        if (selectedWeekday !== 'all') {
+            const targetDay = parseInt(selectedWeekday);
+            periodTasks = periodTasks.filter(task => {
+                // Robust parsing of local YYYY-MM-DD string to get correct weekday
+                const [y, m, d] = task.date.split('-').map(Number);
+                const date = new Date(y, m - 1, d);
+                return date.getDay() === targetDay;
+            });
         }
 
-        return tasks;
-    }, [tasks, timePeriod]);
+        return periodTasks;
+    }, [tasks, timePeriod, selectedWeekday]);
 
     // Calculate statistics
     const stats = useMemo(() => {
@@ -102,8 +105,6 @@ const Analytics = ({ tasks }) => {
     }, [filteredTasks]);
 
 
-
-
     const formatDate = (dateString) => {
         if (!dateString) return 'N/A';
         const date = new Date(`${dateString}T00:00:00`);
@@ -115,21 +116,20 @@ const Analytics = ({ tasks }) => {
         const taskCount = filteredTasks.length;
         const taskText = taskCount === 1 ? 'task' : 'tasks';
 
-        if (timePeriod === 'all') return `All Time (${taskCount} ${taskText})`;
-
-        // Use same robust logic as filter
-        const now = new Date();
-        const offsetMinutes = now.getTimezoneOffset();
-        const shiftedDate = new Date(now.getTime() - (offsetMinutes * 60 * 1000));
-
-        const getShiftedDateString = (date) => {
-            const year = date.getUTCFullYear();
-            const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-            const day = String(date.getUTCDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
-        };
+        // Base range string based on Time Period
+        let rangeString = 'All Time';
 
         if (timePeriod === 'week') {
+            const now = new Date();
+            const offsetMinutes = now.getTimezoneOffset();
+            const shiftedDate = new Date(now.getTime() - (offsetMinutes * 60 * 1000));
+            const getShiftedDateString = (date) => {
+                const year = date.getUTCFullYear();
+                const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+                const day = String(date.getUTCDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            };
+
             const dayOfWeek = shiftedDate.getUTCDay();
             const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
 
@@ -139,17 +139,22 @@ const Analytics = ({ tasks }) => {
             const endOfWeek = new Date(startOfWeek);
             endOfWeek.setUTCDate(startOfWeek.getUTCDate() + 6);
 
-            return `${formatDate(getShiftedDateString(startOfWeek))} - ${formatDate(getShiftedDateString(endOfWeek))} (${taskCount} ${taskText})`;
+            rangeString = `${formatDate(getShiftedDateString(startOfWeek))} - ${formatDate(getShiftedDateString(endOfWeek))}`;
+        } else if (timePeriod === 'month') {
+            const now = new Date();
+            const offsetMinutes = now.getTimezoneOffset();
+            const shiftedDate = new Date(now.getTime() - (offsetMinutes * 60 * 1000));
+            rangeString = shiftedDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
         }
 
-        if (timePeriod === 'month') {
-            // Use UTC methods on shifted date for consistent month display
-            const monthName = shiftedDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
-            return `${monthName} (${taskCount} ${taskText})`;
+        // Append Weekday info if selected
+        if (selectedWeekday !== 'all') {
+            const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+            rangeString += ` (${days[parseInt(selectedWeekday)]}s only)`;
         }
 
-        return '';
-    }, [timePeriod, filteredTasks.length]);
+        return `${rangeString} (${taskCount} ${taskText})`;
+    }, [timePeriod, filteredTasks.length, selectedWeekday]);
 
     return (
         <section className="content-section active">
@@ -164,8 +169,8 @@ const Analytics = ({ tasks }) => {
                     </div>
                     <FaChartLine />
                 </div>
-                <div className="filter-container" style={{ marginBottom: 0 }}>
-                    <div className="filter-group">
+                <div className="filter-container" style={{ marginBottom: 0, display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
+                    <div className="filter-group" style={{ flex: 1, minWidth: '150px' }}>
                         <label className="form-label">Time Period</label>
                         <select
                             className="form-control"
@@ -175,6 +180,23 @@ const Analytics = ({ tasks }) => {
                             <option value="week">This Week</option>
                             <option value="month">This Month</option>
                             <option value="all">All Time</option>
+                        </select>
+                    </div>
+                    <div className="filter-group" style={{ flex: 1, minWidth: '150px' }}>
+                        <label className="form-label">Day of Week</label>
+                        <select
+                            className="form-control"
+                            value={selectedWeekday}
+                            onChange={(e) => setSelectedWeekday(e.target.value)}
+                        >
+                            <option value="all">All Days</option>
+                            <option value="1">Monday</option>
+                            <option value="2">Tuesday</option>
+                            <option value="3">Wednesday</option>
+                            <option value="4">Thursday</option>
+                            <option value="5">Friday</option>
+                            <option value="6">Saturday</option>
+                            <option value="0">Sunday</option>
                         </select>
                     </div>
                 </div>

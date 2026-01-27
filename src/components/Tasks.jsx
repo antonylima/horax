@@ -232,6 +232,16 @@ const Tasks = ({
             result = result.filter(task => task.date < today);
         }
 
+        // Weekday Filter
+        if (filters.weekday && filters.weekday !== 'all') {
+            const targetDay = parseInt(filters.weekday);
+            result = result.filter(task => {
+                const [y, m, d] = task.date.split('-').map(Number);
+                const date = new Date(y, m - 1, d);
+                return date.getDay() === targetDay;
+            });
+        }
+
         // Category Filter
         if (filters.category !== 'all') {
             result = result.filter(task => task.tags.includes(filters.category));
@@ -390,7 +400,7 @@ const Tasks = ({
 
                 <div className="filter-container">
                     <div className="filter-group">
-                        <label className="form-label" htmlFor="filterDay">Filter by Day</label>
+                        <label className="form-label" htmlFor="filterDay">Filter by Range</label>
                         <select
                             className="form-control"
                             id="filterDay"
@@ -403,7 +413,26 @@ const Tasks = ({
                             <option value="week">This Week</option>
                             <option value="next-week">Next Week</option>
                             <option value="past">Past Tasks</option>
-                            <option value="all">All Days</option>
+                            <option value="all">All Dates</option>
+                        </select>
+                    </div>
+
+                    <div className="filter-group">
+                        <label className="form-label" htmlFor="filterWeekday">Filter by Weekday</label>
+                        <select
+                            className="form-control"
+                            id="filterWeekday"
+                            value={filters.weekday || 'all'}
+                            onChange={(e) => setFilters(prev => ({ ...prev, weekday: e.target.value }))}
+                        >
+                            <option value="all">Any Day</option>
+                            <option value="1">Monday</option>
+                            <option value="2">Tuesday</option>
+                            <option value="3">Wednesday</option>
+                            <option value="4">Thursday</option>
+                            <option value="5">Friday</option>
+                            <option value="6">Saturday</option>
+                            <option value="0">Sunday</option>
                         </select>
                     </div>
 
@@ -501,7 +530,7 @@ const Tasks = ({
                     )}
                 </div>
             </div>
-        </section>
+        </section >
     );
 };
 
