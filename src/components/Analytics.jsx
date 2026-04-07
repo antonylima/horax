@@ -9,56 +9,57 @@ import {
 } from 'react-icons/fa';
 
 const Analytics = ({ tasks }) => {
-    const [timePeriod, setTimePeriod] = useState('week'); // week, month, all
+    const [timePeriod, setTimePeriod] = useState('week'); // week, month
     const [selectedWeekday, setSelectedWeekday] = useState('all'); // all, 0-6 (Sun-Sat)
 
-    // Filter tasks based on time period AND weekday
+    // Filter tasks based on time period AND weekday - NEVER include past tasks
     const filteredTasks = useMemo(() => {
-        let periodTasks = tasks;
+        const now = new Date();
+        const offsetMinutes = now.getTimezoneOffset();
+        const shiftedDate = new Date(now.getTime() - (offsetMinutes * 60 * 1000));
 
-        // 1. Filter by Time Period
-        if (timePeriod !== 'all') {
-            const now = new Date();
-            const offsetMinutes = now.getTimezoneOffset();
-            const shiftedDate = new Date(now.getTime() - (offsetMinutes * 60 * 1000));
+        const getShiftedDateString = (date) => {
+            const year = date.getUTCFullYear();
+            const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+            const day = String(date.getUTCDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
 
-            const getShiftedDateString = (date) => {
-                const year = date.getUTCFullYear();
-                const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-                const day = String(date.getUTCDate()).padStart(2, '0');
-                return `${year}-${month}-${day}`;
-            };
+        const today = getShiftedDateString(shiftedDate);
 
-            if (timePeriod === 'week') {
-                const dayOfWeek = shiftedDate.getUTCDay();
-                const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+        // Always exclude past tasks - system ignores past completely
+        let periodTasks = tasks.filter(task => task.date >= today);
 
-                const startOfWeek = new Date(shiftedDate);
-                startOfWeek.setUTCDate(shiftedDate.getUTCDate() - daysSinceMonday);
+        // Filter by Time Period
+        if (timePeriod === 'week') {
+            const dayOfWeek = shiftedDate.getUTCDay();
+            const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
 
-                const endOfWeek = new Date(startOfWeek);
-                endOfWeek.setUTCDate(startOfWeek.getUTCDate() + 6);
+            const startOfWeek = new Date(shiftedDate);
+            startOfWeek.setUTCDate(shiftedDate.getUTCDate() - daysSinceMonday);
 
-                const startOfWeekStr = getShiftedDateString(startOfWeek);
-                const endOfWeekStr = getShiftedDateString(endOfWeek);
+            const endOfWeek = new Date(startOfWeek);
+            endOfWeek.setUTCDate(startOfWeek.getUTCDate() + 6);
 
-                periodTasks = tasks.filter(task => task.date >= startOfWeekStr && task.date <= endOfWeekStr);
-            } else if (timePeriod === 'month') {
-                const startOfMonth = new Date(shiftedDate);
-                startOfMonth.setUTCDate(1);
+            const startOfWeekStr = getShiftedDateString(startOfWeek);
+            const endOfWeekStr = getShiftedDateString(endOfWeek);
 
-                const endOfMonth = new Date(shiftedDate);
-                endOfMonth.setUTCMonth(endOfMonth.getUTCMonth() + 1);
-                endOfMonth.setUTCDate(0);
+            periodTasks = periodTasks.filter(task => task.date >= startOfWeekStr && task.date <= endOfWeekStr);
+        } else if (timePeriod === 'month') {
+            const startOfMonth = new Date(shiftedDate);
+            startOfMonth.setUTCDate(1);
 
-                const startStr = getShiftedDateString(startOfMonth);
-                const endStr = getShiftedDateString(endOfMonth);
+            const endOfMonth = new Date(shiftedDate);
+            endOfMonth.setUTCMonth(endOfMonth.getUTCMonth() + 1);
+            endOfMonth.setUTCDate(0);
 
-                periodTasks = tasks.filter(task => task.date >= startStr && task.date <= endStr);
-            }
+            const startStr = getShiftedDateString(startOfMonth);
+            const endStr = getShiftedDateString(endOfMonth);
+
+            periodTasks = periodTasks.filter(task => task.date >= startStr && task.date <= endStr);
         }
 
-        // 2. Filter by Weekday
+        // Filter by Weekday
         if (selectedWeekday !== 'all') {
             const targetDay = parseInt(selectedWeekday);
             periodTasks = periodTasks.filter(task => {
@@ -117,19 +118,19 @@ const Analytics = ({ tasks }) => {
         const taskText = taskCount === 1 ? 'task' : 'tasks';
 
         // Base range string based on Time Period
-        let rangeString = 'All Time';
+        let rangeString = '';
+
+        const now = new Date();
+        const offsetMinutes = now.getTimezoneOffset();
+        const shiftedDate = new Date(now.getTime() - (offsetMinutes * 60 * 1000));
+        const getShiftedDateString = (date) => {
+            const year = date.getUTCFullYear();
+            const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+            const day = String(date.getUTCDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
 
         if (timePeriod === 'week') {
-            const now = new Date();
-            const offsetMinutes = now.getTimezoneOffset();
-            const shiftedDate = new Date(now.getTime() - (offsetMinutes * 60 * 1000));
-            const getShiftedDateString = (date) => {
-                const year = date.getUTCFullYear();
-                const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-                const day = String(date.getUTCDate()).padStart(2, '0');
-                return `${year}-${month}-${day}`;
-            };
-
             const dayOfWeek = shiftedDate.getUTCDay();
             const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
 
@@ -141,9 +142,6 @@ const Analytics = ({ tasks }) => {
 
             rangeString = `${formatDate(getShiftedDateString(startOfWeek))} - ${formatDate(getShiftedDateString(endOfWeek))}`;
         } else if (timePeriod === 'month') {
-            const now = new Date();
-            const offsetMinutes = now.getTimezoneOffset();
-            const shiftedDate = new Date(now.getTime() - (offsetMinutes * 60 * 1000));
             rangeString = shiftedDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
         }
 
@@ -179,7 +177,6 @@ const Analytics = ({ tasks }) => {
                         >
                             <option value="week">This Week</option>
                             <option value="month">This Month</option>
-                            <option value="all">All Time</option>
                         </select>
                     </div>
                     <div className="filter-group" style={{ flex: 1, minWidth: '150px' }}>

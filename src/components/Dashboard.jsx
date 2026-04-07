@@ -8,6 +8,11 @@ const Dashboard = ({ tasks, onEditTask, onDeleteTask, onToggleTaskComplete, onOp
     const localDate = new Date(now.getTime() - (offset * 60 * 1000));
     const today = localDate.toISOString().split('T')[0];
 
+    // Filter out past tasks - system ignores past completely
+    const futureTasks = useMemo(() => {
+        return tasks.filter(task => task.date >= today);
+    }, [tasks, today]);
+
     const formatTime = (timeString) => {
         const [hours, minutes] = timeString.split(':');
         const hour = parseInt(hours, 10);
@@ -28,12 +33,19 @@ const Dashboard = ({ tasks, onEditTask, onDeleteTask, onToggleTaskComplete, onOp
         startOfDay.setHours(0, 0, 0, 0);
         const timePassed = now - startOfDay;
 
+        // Only count time from tasks that haven't ended yet
         let totalTaskDuration = 0;
-        tasks.forEach(task => {
+        futureTasks.forEach(task => {
             if (task.date === today && !task.completed) {
                 const startTime = new Date(`${task.date}T${task.startTime}`);
                 const endTime = new Date(`${task.date}T${task.endTime}`);
-                totalTaskDuration += endTime - startTime;
+                
+                // Only count tasks that haven't ended yet
+                if (endTime > now) {
+                    // If task already started, count only remaining time
+                    const effectiveStart = startTime > now ? startTime : now;
+                    totalTaskDuration += endTime - effectiveStart;
+                }
             }
         });
 
@@ -44,7 +56,7 @@ const Dashboard = ({ tasks, onEditTask, onDeleteTask, onToggleTaskComplete, onOp
         const minutes = Math.floor((remainingTimeMs % (60 * 60 * 1000)) / (60 * 1000));
 
         return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-    }, [tasks, now, today]);
+    }, [futureTasks, now, today]);
 
     const weeklySchedules = useMemo(() => {
         const weeks = [];
@@ -71,8 +83,8 @@ const Dashboard = ({ tasks, onEditTask, onDeleteTask, onToggleTaskComplete, onOp
                 effectiveStart = now > start ? now : start;
             }
 
-            // Filter tasks for this week to display
-            const weekTasks = tasks
+            // Filter tasks for this week to display - only future tasks
+            const weekTasks = futureTasks
                 .filter(task => {
                     const tDate = new Date(`${task.date}T00:00:00`);
                     return tDate >= start && tDate <= end && !task.completed;
@@ -90,7 +102,7 @@ const Dashboard = ({ tasks, onEditTask, onDeleteTask, onToggleTaskComplete, onOp
             // Calculate duration of tasks that consume this capacity
             // i.e., tasks that end after effectiveStart
             let scheduledDuration = 0;
-            tasks.forEach(task => {
+            futureTasks.forEach(task => {
                 const tDate = new Date(`${task.date}T00:00:00`);
                 if (tDate >= start && tDate <= end) {
                     const s = new Date(`${task.date}T${task.startTime}`);
@@ -122,7 +134,7 @@ const Dashboard = ({ tasks, onEditTask, onDeleteTask, onToggleTaskComplete, onOp
             });
         }
         return weeks;
-    }, [tasks, now]);
+    }, [futureTasks, now]);
 
     const totalRemaining = useMemo(() => {
         // Sum up remainingMs from all weeks (we need to recalculate for hidden weeks if we want TRUE total, 
@@ -141,47 +153,49 @@ const Dashboard = ({ tasks, onEditTask, onDeleteTask, onToggleTaskComplete, onOp
 
 
     const todayProgress = useMemo(() => {
+        // Only count time from tasks that haven't ended yet
         let totalTaskDuration = 0;
-        tasks.forEach(task => {
+        futureTasks.forEach(task => {
             if (task.date === today) {
                 const startTime = new Date(`${task.date}T${task.startTime}`);
                 const endTime = new Date(`${task.date}T${task.endTime}`);
-                totalTaskDuration += endTime - startTime;
+                
+                // Only count tasks that haven't ended yet
+                if (endTime > now) {
+                    // If task already started, count only remaining time
+                    const effectiveStart = startTime > now ? startTime : now;
+                    totalTaskDuration += endTime - effectiveStart;
+                }
             }
         });
 
         const totalDayMs = 24 * 60 * 60 * 1000;
         const progress = Math.min(100, Math.round((totalTaskDuration / totalDayMs) * 100));
         return `${progress}%`;
-    }, [tasks, today]);
+    }, [futureTasks, today, now]);
 
     const todayTasks = useMemo(() => {
-        return tasks
-            .filter(task => task.date === today)
+        // Only show tasks that haven't ended yet
+        return futureTasks
+            .filter(task => {
+                if (task.date !== today) return false;
+                const endTime = new Date(`${task.date}T${task.endTime}`);
+                return endTime > now;
+            })
             .sort((a, b) => a.startTime.localeCompare(b.startTime));
-    }, [tasks, today]);
+    }, [futureTasks, today, now]);
 
     const upcomingTasks = useMemo(() => {
-        return tasks
-            .filter(task => {
-                const taskDate = new Date(task.date);
-                // Simple comparison for "upcoming" (today or future, not completed)
-                // Note: Original logic used `taskDate >= now` which is tricky with just date string. 
-                // Original: `taskDate >= now` where taskDate is from `new Date(task.date)` (midnight) and `now` is current time.
-                // If task.date is today, `new Date(today)` is midnight today. `now` is current time.
-                // So `new Date(today) >= now` is false if it's past midnight.
-                // The original logic `taskDate >= now` might have excluded today's tasks if `now` > midnight?
-                // Wait, `new Date('2023-10-27')` is UTC or local midnight? `valueAsDate` sets it.
-                // Let's stick to: date >= todayStr.
-                return task.date >= today && !task.completed;
-            })
+        // Only show future tasks (today or future, not completed)
+        return futureTasks
+            .filter(task => !task.completed)
             .sort((a, b) => {
                 const dateCompare = a.date.localeCompare(b.date);
                 if (dateCompare !== 0) return dateCompare;
                 return a.startTime.localeCompare(b.startTime);
             })
             .slice(0, 5);
-    }, [tasks, today]);
+    }, [futureTasks]);
 
 
 

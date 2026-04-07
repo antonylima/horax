@@ -228,9 +228,8 @@ const Tasks = ({
             result = result.filter(task => task.date >= startStr && task.date <= endStr);
         } else if (filters.day === 'future') {
             result = result.filter(task => task.date >= today);
-        } else if (filters.day === 'past') {
-            result = result.filter(task => task.date < today);
         }
+        // Past tasks are never shown - system ignores past completely
 
         // Weekday Filter
         if (filters.weekday && filters.weekday !== 'all') {
@@ -412,8 +411,6 @@ const Tasks = ({
                             <option value="tomorrow">Tomorrow</option>
                             <option value="week">This Week</option>
                             <option value="next-week">Next Week</option>
-                            <option value="past">Past Tasks</option>
-                            <option value="all">All Dates</option>
                         </select>
                     </div>
 
