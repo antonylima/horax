@@ -1,5 +1,5 @@
 import React from 'react';
-import { FaClock, FaTachometerAlt, FaTasks, FaChartPie } from 'react-icons/fa';
+import { FaClock, FaTachometerAlt, FaTasks, FaChartPie, FaCalendarWeek } from 'react-icons/fa';
 
 const Header = ({ activeTab, setActiveTab }) => {
     return (
@@ -22,6 +22,12 @@ const Header = ({ activeTab, setActiveTab }) => {
                             onClick={() => setActiveTab('tasks')}
                         >
                             <FaTasks /> Tasks
+                        </div>
+                        <div
+                            className={`nav-tab ${activeTab === 'patterns' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('patterns')}
+                        >
+                            <FaCalendarWeek /> Patterns
                         </div>
                         <div
                             className={`nav-tab ${activeTab === 'analytics' ? 'active' : ''}`}

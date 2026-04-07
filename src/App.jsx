@@ -3,9 +3,10 @@ import Header from './components/Header';
 import Dashboard from './components/Dashboard';
 import Tasks from './components/Tasks';
 import Analytics from './components/Analytics';
+import WeeklyPatterns from './components/WeeklyPatterns';
 import Modal from './components/Modal';
 import NotificationContainer from './components/Notification';
-import { FaCopy, FaTrashAlt, FaExclamationTriangle } from 'react-icons/fa';
+import { FaCopy, FaTrashAlt, FaExclamationTriangle, FaSync } from 'react-icons/fa';
 import { query } from './lib/db';
 
 import {
@@ -74,6 +75,26 @@ function App() {
     };
   };
 
+  // Initialize database schema (create weekly_patterns table if not exists)
+  const initDbSchema = async () => {
+    try {
+      await query(`
+        CREATE TABLE IF NOT EXISTS weekly_patterns (
+          id TEXT PRIMARY KEY,
+          title TEXT NOT NULL,
+          weekday INTEGER NOT NULL CHECK (weekday >= 0 AND weekday <= 6),
+          start_time TIME NOT NULL,
+          end_time TIME NOT NULL,
+          tags TEXT[],
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      console.log('Database schema initialized');
+    } catch (error) {
+      console.error('Error initializing schema:', error);
+    }
+  };
+
   // Fetch tasks from DB
   const fetchTasks = async () => {
     try {
@@ -89,8 +110,79 @@ function App() {
     }
   };
 
+  // Generate tasks from weekly patterns for the next 90 days
+  const syncTasksFromPatterns = async () => {
+    try {
+      // Get all patterns
+      const patternsRes = await query('SELECT * FROM weekly_patterns');
+      const patterns = patternsRes.rows;
+
+      if (patterns.length === 0) {
+        addNotification('No patterns defined. Create patterns first.', 'warning');
+        return;
+      }
+
+      // Get existing tasks to check for duplicates
+      const existingTasksRes = await query('SELECT id, date, title, start_time FROM tasks');
+      const existingTasks = existingTasksRes.rows;
+
+      // Create a set of existing task signatures for quick lookup
+      const existingSignatures = new Set(
+        existingTasks.map(t => `${t.date}-${t.title}-${t.start_time}`)
+      );
+
+      // Generate dates for next 90 days
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const dates = [];
+      for (let i = 0; i < 90; i++) {
+        const date = new Date(today);
+        date.setDate(today.getDate() + i);
+        dates.push({
+          date: date.toISOString().split('T')[0],
+          dayOfWeek: date.getDay()
+        });
+      }
+
+      let createdCount = 0;
+
+      // For each date, create tasks from patterns
+      for (const { date, dayOfWeek } of dates) {
+        const dayPatterns = patterns.filter(p => p.weekday === dayOfWeek);
+
+        for (const pattern of dayPatterns) {
+          const signature = `${date}-${pattern.title}-${pattern.start_time.slice(0, 5)}`;
+
+          // Skip if task already exists
+          if (existingSignatures.has(signature)) {
+            continue;
+          }
+
+          // Create task
+          const id = Date.now().toString() + Math.random().toString(36).substr(2, 5);
+          try {
+            await query(
+              'INSERT INTO tasks (id, title, date, start_time, end_time, tags) VALUES ($1, $2, $3, $4, $5, $6)',
+              [id, pattern.title, date, pattern.start_time, pattern.end_time, pattern.tags || []]
+            );
+            createdCount++;
+          } catch (err) {
+            console.error('Error creating task:', err);
+          }
+        }
+      }
+
+      await fetchTasks();
+      addNotification(`Synced! ${createdCount} new tasks created from patterns.`, 'success');
+    } catch (error) {
+      console.error('Error syncing tasks:', error);
+      addNotification('Error syncing tasks from patterns', 'error');
+    }
+  };
+
   // Initial fetch
   useEffect(() => {
+    initDbSchema();
     fetchTasks();
   }, []);
 
@@ -551,6 +643,17 @@ function App() {
 
         <div style={{ display: activeTab === 'analytics' ? 'block' : 'none' }}>
           {activeTab === 'analytics' && <Analytics tasks={tasks} />}
+        </div>
+
+        <div style={{ display: activeTab === 'patterns' ? 'block' : 'none' }}>
+          {activeTab === 'patterns' && (
+            <WeeklyPatterns 
+              onPatternsChange={() => {
+                fetchTasks();
+              }}
+              onSyncTasks={syncTasksFromPatterns}
+            />
+          )}
         </div>
       </main>
 
